@@ -1,6 +1,6 @@
 /*jslint vars: true, devel: true, nomen: true, indent: 4, maxerr: 50 */
 /*global define, require, module */
-(this.define || function (f) { "use strict"; var n = "StyleRewriter", r = f((typeof (require) === "undefined") ? function () { } : require); if ((typeof (module) !== "undefined") && module.exports) { module.exports = r; } else { this[n] = r; } }).call(this, function (require) {
+(this.define || function (f) { "use strict"; var n = "StyleRewriter", r = f((typeof (require) === "undefined") ? function (a) { return ((typeof (window) === "undefined") ? {} : window)[a]; } : require); if ((typeof (module) !== "undefined") && module.exports) { module.exports = r; } else { this[n] = r; } }).call(this, function (require) {
 
     "use strict";
     
@@ -356,12 +356,21 @@
             // we'll make no assumptions.. returning 0 if the previous fragment was followed by a line return and 1 if not)
             return isThereAlreadyLineReturnBeforeThisFragment ? 0 : 1;
         }
+        
+        // TODO
+        if (isStylePropertyName(fragment) && (isSelector(previousFragmentIfAny) || isMediaQuery(previousFragmentIfAny))) {
+            return 2;
+        }
 
         // Any style property name should indicate the start of a new line unless the previous fragment was a Comment that wants to stay
         // associated with the line that the property is on (at the moment, all Comments have trailing line returns so this wouldn't
         // happen, but that's up to the code that deals with Comments to decide)
-        if (isStylePropertyName(fragment) && !isComment(previousFragmentIfAny)) {
-            return 1;
+        if (isStylePropertyName(fragment)) {
+            if (isSelector(previousFragmentIfAny) || isMediaQuery(previousFragmentIfAny)) {
+                return 2;
+            } else if (!isComment(previousFragmentIfAny)) {
+                return 1;
+            }
         }
 
         return 0;
