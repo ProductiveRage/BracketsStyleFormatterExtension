@@ -140,16 +140,18 @@
             // value. If the next non-ignorable fragment is anything else (such as another StylePropertyName or a
             // Selector or a Media Query) then this StylePropertyName does not have an associated StylePropertyValue
             // and so presumably is a Mixin.
-            var confirmedToBePropertyName = nextFragments.some(function (laterFragment) {
+            var confirmedToBePropertyName;
+            nextFragments.some(function (laterFragment) {
                 if (isComment(laterFragment)) {
                     return false; // Ignore comments, they make no difference one way or the other
                 }
-                return isStylePropertyValue(laterFragment);
+                confirmedToBePropertyName = isStylePropertyValue(laterFragment);
+                return true;
             });
             var suffix;
             if (confirmedToBePropertyName) {
                 suffix = ": ";
-            } else if (!fragment.Value.EndsWith(")")) {
+            } else if (fragment.Value.substr(-1) !== ")") {
                 // It's good practice to always use brackets when specifying a mixin, so we'll enforce it when rewriting
                 // the content (it means that analysis about duplicate selectors does not mistakenly consider mixins
                 // to be selectors when performing the work)
