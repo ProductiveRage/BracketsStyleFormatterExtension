@@ -4,7 +4,7 @@
 
     "use strict";
     
-    var CharacterCategorisationOptions, ParseError, objCharacterProcessors, getCharacterPositionStringNavigator, processCharacters, groupCharacters, CssParserJs;
+    var CharacterCategorisationOptions, ParseError, characterProcessors, getCharacterPositionStringNavigator, processCharacters, groupCharacters, CssParserJs;
     
     CharacterCategorisationOptions = {
         Comment: 0,
@@ -15,16 +15,16 @@
         StylePropertyColon: 5, // This is the colon between a Style Property and Value
         Value: 6,
         Whitespace: 7,
-        GetNameFor: function (intValue) {
-            var strPropertyName;
-            for (strPropertyName in CharacterCategorisationOptions) {
-                if (CharacterCategorisationOptions.hasOwnProperty(strPropertyName)) {
-                    if (CharacterCategorisationOptions[strPropertyName] === intValue) {
-                        return strPropertyName;
+        GetNameFor: function (value) {
+            var propertyName;
+            for (propertyName in CharacterCategorisationOptions) {
+                if (CharacterCategorisationOptions.hasOwnProperty(propertyName)) {
+                    if (CharacterCategorisationOptions[propertyName] === value) {
+                        return propertyName;
                     }
                 }
             }
-            throw new Error("Invalid CharacterCategorisationOptions: " + intValue);
+            throw new Error("Invalid CharacterCategorisationOptions: " + value);
         }
     };
 
@@ -36,142 +36,142 @@
     ParseError.prototype.constructor = ParseError;
     ParseError.prototype.name = "ParseError";
     
-    objCharacterProcessors = (function () {
+    characterProcessors = (function () {
         var getCharacterProcessorResult,
             getSkipNextCharacterSegment,
             getSingleLineCommentSegment,
             getMultiLineCommentSegment,
             getMediaQuerySegment,
             getQuotedSegment,
-            arrPseudoClasses,
+            pseudoClasses,
             isNextWordOneOfThePseudoClasses,
             getBracketedSelectorSegment,
             getSelectorOrStyleSegment;
 
-        getCharacterProcessorResult = function (intCharacterCategorisation, objNextProcessor) {
+        getCharacterProcessorResult = function (characterCategorisation, nextProcessor) {
             return {
-                CharacterCategorisation: intCharacterCategorisation,
-                NextProcessor: objNextProcessor
+                CharacterCategorisation: characterCategorisation,
+                NextProcessor: nextProcessor
             };
         };
 
-        getSkipNextCharacterSegment = function (intCharacterCategorisation, objCharacterProcessorToReturnTo) {
+        getSkipNextCharacterSegment = function (characterCategorisation, characterProcessorToReturnTo) {
             return {
-                Process: function (objStringNavigator) {
+                Process: function (stringNavigator) {
                     return getCharacterProcessorResult(
-                        intCharacterCategorisation,
-                        objCharacterProcessorToReturnTo
+                        characterCategorisation,
+                        characterProcessorToReturnTo
                     );
                 }
             };
         };
 
-        getSingleLineCommentSegment = function (objCharacterProcessorToReturnTo) {
-            var objProcessor = {
-                Process: function (objStringNavigator) {
+        getSingleLineCommentSegment = function (characterProcessorToReturnTo) {
+            var processor = {
+                Process: function (stringNavigator) {
                     // For single line comments, the line return should be considered part of the comment content (in the same way that the "/*" and "*/" sequences
                     // are considered part of the content for multi-line comments)
-                    if (objStringNavigator.DoesCurrentContentMatch("\r\n")) {
+                    if (stringNavigator.DoesCurrentContentMatch("\r\n")) {
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.Comment,
                             getSkipNextCharacterSegment(
                                 CharacterCategorisationOptions.Comment,
-                                objCharacterProcessorToReturnTo
+                                characterProcessorToReturnTo
                             )
                         );
-                    } else if ((objStringNavigator.CurrentCharacter === "\r") || (objStringNavigator.CurrentCharacter === "\n")) {
+                    } else if ((stringNavigator.CurrentCharacter === "\r") || (stringNavigator.CurrentCharacter === "\n")) {
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.Comment,
-                            objCharacterProcessorToReturnTo
+                            characterProcessorToReturnTo
                         );
                     }
                     return getCharacterProcessorResult(
                         CharacterCategorisationOptions.Comment,
-                        objProcessor
+                        processor
                     );
                 }
             };
-            return objProcessor;
+            return processor;
         };
 
-        getMultiLineCommentSegment = function (objCharacterProcessorToReturnTo) {
-            var objProcessor = {
-                Process: function (objStringNavigator) {
-                    if (objStringNavigator.DoesCurrentContentMatch("*/")) {
+        getMultiLineCommentSegment = function (characterProcessorToReturnTo) {
+            var processor = {
+                Process: function (stringNavigator) {
+                    if (stringNavigator.DoesCurrentContentMatch("*/")) {
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.Comment,
                             getSkipNextCharacterSegment(
                                 CharacterCategorisationOptions.Comment,
-                                objCharacterProcessorToReturnTo
+                                characterProcessorToReturnTo
                             )
                         );
                     }
                     return getCharacterProcessorResult(
                         CharacterCategorisationOptions.Comment,
-                        objProcessor
+                        processor
                     );
                 }
             };
-            return objProcessor;
+            return processor;
         };
 
-        getMediaQuerySegment = function (objCharacterProcessorToReturnTo) {
-            var objProcessor = {
-                Process: function (objStringNavigator) {
-                    if (objStringNavigator.CurrentCharacter === "{") {
+        getMediaQuerySegment = function (characterProcessorToReturnTo) {
+            var processor = {
+                Process: function (stringNavigator) {
+                    if (stringNavigator.CurrentCharacter === "{") {
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.OpenBrace,
-                            objCharacterProcessorToReturnTo
+                            characterProcessorToReturnTo
                         );
-                    } else if (objStringNavigator.IsWhitespace) {
+                    } else if (stringNavigator.IsWhitespace) {
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.Whitespace,
-                            objProcessor
+                            processor
                         );
                     }
 
                     return getCharacterProcessorResult(
                         CharacterCategorisationOptions.SelectorOrStyleProperty,
-                        objProcessor
+                        processor
                     );
                 }
             };
-            return objProcessor;
+            return processor;
         };
 
-        getQuotedSegment = function (chrQuote, intCharacterCategorisation, objCharacterProcessorToReturnTo) {
-            var objProcessor = {
-                Process: function (objStringNavigator) {
+        getQuotedSegment = function (quoteCharacter, characterCategorisation, characterProcessorToReturnTo) {
+            var processor = {
+                Process: function (stringNavigator) {
                     // If the next character is a backslash then the next character should be ignored if it's "special" and just considered  to be another character
                     // in the Value string (particularly important if the next character is an escaped quote)
-                    if (objStringNavigator.CurrentCharacter === "\\") {
+                    if (stringNavigator.CurrentCharacter === "\\") {
                         return getCharacterProcessorResult(
-                            intCharacterCategorisation,
+                            characterCategorisation,
                             getSkipNextCharacterSegment(
-                                intCharacterCategorisation,
-                                objProcessor
+                                characterCategorisation,
+                                processor
                             )
                         );
                     }
 
                     // If this is the closing quote character then include it in the Value and then return to the previous processor
-                    if (objStringNavigator.CurrentCharacter === chrQuote) {
+                    if (stringNavigator.CurrentCharacter === quoteCharacter) {
                         return getCharacterProcessorResult(
-                            intCharacterCategorisation,
-                            objCharacterProcessorToReturnTo
+                            characterCategorisation,
+                            characterProcessorToReturnTo
                         );
                     }
 
                     return getCharacterProcessorResult(
-                        intCharacterCategorisation,
-                        objProcessor
+                        characterCategorisation,
+                        processor
                     );
                 }
             };
-            return objProcessor;
+            return processor;
         };
 
-        arrPseudoClasses = [
+        pseudoClasses = [
             "lang",
             "link",
             "after",
@@ -210,98 +210,98 @@
             "valid"
         ];
 
-        isNextWordOneOfThePseudoClasses = function (objStringNavigator) {
+        isNextWordOneOfThePseudoClasses = function (stringNavigator) {
             // Skip over any whitespace to find the start of the next content
-            while (objStringNavigator.IsWhitespace) {
-                objStringNavigator = objStringNavigator.GetNext();
+            while (stringNavigator.IsWhitespace) {
+                stringNavigator = stringNavigator.GetNext();
             }
-            return arrPseudoClasses.some(function (strPseudoClass) {
-                return objStringNavigator.DoesCurrentContentMatch(strPseudoClass);
+            return pseudoClasses.some(function (pseudoClass) {
+                return stringNavigator.DoesCurrentContentMatch(pseudoClass);
             });
         };
 
-        getBracketedSelectorSegment = function (bSupportSingleLineComments, chrCloseBracketCharacter, objProcessorToReturnTo) {
-            var objOptionalCharacterCategorisationBehaviourOverride = {
-                EndOfBehaviourOverrideCharacter: chrCloseBracketCharacter,
+        getBracketedSelectorSegment = function (supportSingleLineComments, closeBracketCharacter, processorToReturnTo) {
+            var optionalCharacterCategorisationBehaviourOverride = {
+                EndOfBehaviourOverrideCharacter: closeBracketCharacter,
                 CharacterCategorisation: CharacterCategorisationOptions.SelectorOrStyleProperty,
-                CharacterProcessorToReturnTo: objProcessorToReturnTo
+                CharacterProcessorToReturnTo: processorToReturnTo
             };
-            return getSelectorOrStyleSegment(false, bSupportSingleLineComments, objOptionalCharacterCategorisationBehaviourOverride);
+            return getSelectorOrStyleSegment(false, supportSingleLineComments, optionalCharacterCategorisationBehaviourOverride);
         };
 
-        getSelectorOrStyleSegment = function (bProcessAsValueContent, bSupportSingleLineComments, objOptionalCharacterCategorisationBehaviourOverride) {
-            var objProcessor;
+        getSelectorOrStyleSegment = function (processAsValueContent, supportSingleLineComments, optionalCharacterCategorisationBehaviourOverride) {
+            var processor;
             function getSelectorOrStyleCharacterProcessor() {
-                if (!bProcessAsValueContent) {
-                    return objProcessor;
+                if (!processAsValueContent) {
+                    return processor;
                 }
-                return getSelectorOrStyleSegment(false, bSupportSingleLineComments, null);
+                return getSelectorOrStyleSegment(false, supportSingleLineComments, null);
             }
             function getValueCharacterProcessor() {
-                if (bProcessAsValueContent) {
-                    return objProcessor;
+                if (processAsValueContent) {
+                    return processor;
                 }
-                return getSelectorOrStyleSegment(true, bSupportSingleLineComments, null);
+                return getSelectorOrStyleSegment(true, supportSingleLineComments, null);
             }
-            objProcessor = {
-                Process: function (objStringNavigator) {
-                    var chrNextCharacter, chrClosingBracket;
+            processor = {
+                Process: function (stringNavigator) {
+                    var nextCharacter, closingBracketCharacter;
 
                     // Is this the end of the section that the optionalCharacterCategorisationBehaviourOverride (if non-null) is concerned with? If so then drop back
                     // out to the character processor that handed control over to the optionalCharacterCategorisationBehaviourOverride.
-                    if (objOptionalCharacterCategorisationBehaviourOverride
-                            && (objStringNavigator.CurrentCharacter === objOptionalCharacterCategorisationBehaviourOverride.EndOfBehaviourOverrideCharacter)) {
+                    if (optionalCharacterCategorisationBehaviourOverride
+                            && (stringNavigator.CurrentCharacter === optionalCharacterCategorisationBehaviourOverride.EndOfBehaviourOverrideCharacter)) {
                         return getCharacterProcessorResult(
-                            objOptionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
-                            objOptionalCharacterCategorisationBehaviourOverride.CharacterProcessorToReturnTo
+                            optionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
+                            optionalCharacterCategorisationBehaviourOverride.CharacterProcessorToReturnTo
                         );
                     }
 
                     // Deal with other special characters (bearing in mind the altered interactions if optionalCharacterCategorisationBehaviourOverride is non-null)
-                    if (objStringNavigator.CurrentCharacter === "{") {
-                        if (objOptionalCharacterCategorisationBehaviourOverride) {
+                    if (stringNavigator.CurrentCharacter === "{") {
+                        if (optionalCharacterCategorisationBehaviourOverride) {
                             return getCharacterProcessorResult(
-                                objOptionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
-                                objProcessor
+                                optionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
+                                processor
                             );
                         }
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.OpenBrace,
                             getSelectorOrStyleCharacterProcessor()
                         );
-                    } else if (objStringNavigator.CurrentCharacter === "}") {
-                        if (objOptionalCharacterCategorisationBehaviourOverride) {
+                    } else if (stringNavigator.CurrentCharacter === "}") {
+                        if (optionalCharacterCategorisationBehaviourOverride) {
                             return getCharacterProcessorResult(
-                                objOptionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
-                                objProcessor
+                                optionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
+                                processor
                             );
                         }
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.CloseBrace,
                             getSelectorOrStyleCharacterProcessor()
                         );
-                    } else if (objStringNavigator.CurrentCharacter === ";") {
-                        if (objOptionalCharacterCategorisationBehaviourOverride) {
+                    } else if (stringNavigator.CurrentCharacter === ";") {
+                        if (optionalCharacterCategorisationBehaviourOverride) {
                             return getCharacterProcessorResult(
-                                objOptionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
-                                objProcessor
+                                optionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
+                                processor
                             );
                         }
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.SemiColon,
                             getSelectorOrStyleCharacterProcessor()
                         );
-                    } else if (objStringNavigator.CurrentCharacter === ":") {
-                        if (objOptionalCharacterCategorisationBehaviourOverride) {
+                    } else if (stringNavigator.CurrentCharacter === ":") {
+                        if (optionalCharacterCategorisationBehaviourOverride) {
                             return getCharacterProcessorResult(
-                                objOptionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
-                                objProcessor
+                                optionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
+                                processor
                             );
                         }
 
                         // If the colon indicates a pseudo-class for a selector then we want to continue processing it as a selector and not presume that the content
                         // type has switched to a value (this is more complicated with LESS nesting to support, if it was just CSS  then things would have been easier!)
-                        if (!bProcessAsValueContent && isNextWordOneOfThePseudoClasses(objStringNavigator.GetNext())) {
+                        if (!processAsValueContent && isNextWordOneOfThePseudoClasses(stringNavigator.GetNext())) {
                             return getCharacterProcessorResult(
                                 CharacterCategorisationOptions.SelectorOrStyleProperty,
                                 getSelectorOrStyleCharacterProcessor()
@@ -311,62 +311,62 @@
                             CharacterCategorisationOptions.StylePropertyColon,
                             getValueCharacterProcessor()
                         );
-                    } else if (objStringNavigator.IsWhitespace) {
-                        if (objOptionalCharacterCategorisationBehaviourOverride) {
+                    } else if (stringNavigator.IsWhitespace) {
+                        if (optionalCharacterCategorisationBehaviourOverride) {
                             return getCharacterProcessorResult(
-                                objOptionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
-                                objProcessor
+                                optionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
+                                processor
                             );
                         }
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.Whitespace,
-                            objProcessor
+                            processor
                         );
                     }
 
-                    // To deal with comments we use specialised comment-handling processors (even if an objOptionalCharacterCategorisationBehaviourOverride is
+                    // To deal with comments we use specialised comment-handling processors (even if an optionalCharacterCategorisationBehaviourOverride is
                     // specified we still treat deal with comments as normal, their content is not forced into a different categorisation)
-                    if (objStringNavigator.CurrentCharacter === "/") {
-                        chrNextCharacter = objStringNavigator.GetNext().CurrentCharacter;
-                        if (bSupportSingleLineComments && (chrNextCharacter === "/")) {
+                    if (stringNavigator.CurrentCharacter === "/") {
+                        nextCharacter = stringNavigator.GetNext().CurrentCharacter;
+                        if (supportSingleLineComments && (nextCharacter === "/")) {
                             return getCharacterProcessorResult(
                                 CharacterCategorisationOptions.Comment,
-                                getSingleLineCommentSegment(objProcessor)
+                                getSingleLineCommentSegment(processor)
                             );
-                        } else if (chrNextCharacter === "*") {
+                        } else if (nextCharacter === "*") {
                             return getCharacterProcessorResult(
                                 CharacterCategorisationOptions.Comment,
-                                getMultiLineCommentSegment(objProcessor)
+                                getMultiLineCommentSegment(processor)
                             );
                         }
                     }
 
                     // Although media query declarations will be marked as SelectorOrStyleProperty content, special handling is required to ensure that any colons
                     // that exist in it are identified as part of the SelectorOrStyleProperty and not marked as a StylePropertyColon
-                    if (!bProcessAsValueContent && objStringNavigator.DoesCurrentContentMatch("@media")) {
+                    if (!processAsValueContent && stringNavigator.DoesCurrentContentMatch("@media")) {
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.SelectorOrStyleProperty,
-                            getMediaQuerySegment(objProcessor)
+                            getMediaQuerySegment(processor)
                         );
                     }
 
-                    if ((objStringNavigator.CurrentCharacter === "\"") || (objStringNavigator.CurrentCharacter === "'")) {
-                        // If an objOptionalCharacterCategorisationBehaviourOverride was specified then the content will be identified as whatever categorisation
+                    if ((stringNavigator.CurrentCharacter === "\"") || (stringNavigator.CurrentCharacter === "'")) {
+                        // If an optionalCharacterCategorisationBehaviourOverride was specified then the content will be identified as whatever categorisation
                         // is specified by it, otherwise it will be identified as being CharacterCategorisationOptions.Value
-                        if (objOptionalCharacterCategorisationBehaviourOverride) {
+                        if (optionalCharacterCategorisationBehaviourOverride) {
                             return getCharacterProcessorResult(
-                                objOptionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
+                                optionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
                                 getQuotedSegment(
-                                    objStringNavigator.CurrentCharacter,
-                                    objOptionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
-                                    objProcessor
+                                    stringNavigator.CurrentCharacter,
+                                    optionalCharacterCategorisationBehaviourOverride.CharacterCategorisation,
+                                    processor
                                 )
                             );
                         }
                         return getCharacterProcessorResult(
                             CharacterCategorisationOptions.Value,
                             getQuotedSegment(
-                                objStringNavigator.CurrentCharacter,
+                                stringNavigator.CurrentCharacter,
                                 CharacterCategorisationOptions.Value,
                                 getValueCharacterProcessor()
                             )
@@ -377,21 +377,21 @@
                     // selector (eg. "a[href]") or a LESS mixin argument set (eg. ".RoundedCorners (@radius"). In either case we need to consider all content until
                     // the corresponding close bracket to be a StyleOrSelector, whether it's whitespace or a quoted section (note: not if it's a comment, that still
                     // gets identified as comment content).
-                    if (!bProcessAsValueContent) {
-                        if (objStringNavigator.CurrentCharacter === "[") {
-                            chrClosingBracket = "]";
-                        } else if (objStringNavigator.CurrentCharacter === "(") {
-                            chrClosingBracket = ")";
+                    if (!processAsValueContent) {
+                        if (stringNavigator.CurrentCharacter === "[") {
+                            closingBracketCharacter = "]";
+                        } else if (stringNavigator.CurrentCharacter === "(") {
+                            closingBracketCharacter = ")";
                         } else {
-                            chrClosingBracket = null;
+                            closingBracketCharacter = null;
                         }
-                        if (chrClosingBracket) {
+                        if (closingBracketCharacter) {
                             return getCharacterProcessorResult(
                                 CharacterCategorisationOptions.SelectorOrStyleProperty,
                                 getBracketedSelectorSegment(
-                                    bSupportSingleLineComments,
-                                    chrClosingBracket,
-                                    objProcessor
+                                    supportSingleLineComments,
+                                    closingBracketCharacter,
+                                    processor
                                 )
                             );
                         }
@@ -399,12 +399,12 @@
 
                     // If it's not a quoted or bracketed section, then we can continue to use this instance to process the content
                     return getCharacterProcessorResult(
-                        bProcessAsValueContent ? CharacterCategorisationOptions.Value : CharacterCategorisationOptions.SelectorOrStyleProperty,
-                        objProcessor
+                        processAsValueContent ? CharacterCategorisationOptions.Value : CharacterCategorisationOptions.SelectorOrStyleProperty,
+                        processor
                     );
                 }
             };
-            return objProcessor;
+            return processor;
         };
 
         return {
@@ -417,124 +417,124 @@
         };
     }());
     
-    getCharacterPositionStringNavigator = function (strValue, intIndex) {
+    getCharacterPositionStringNavigator = function (value, index) {
         var
-            bPastEndOfContent = (intIndex >= strValue.length),
-            objStringNavigator = {
-                CurrentCharacter: bPastEndOfContent ? null : strValue.charAt(intIndex),
-                IsWhitespace: bPastEndOfContent ? false : /\s/.test(strValue.charAt(intIndex)),
-                DoesCurrentContentMatch: function (strCheckFor) {
-                    if (!strCheckFor) {
+            bPastEndOfContent = (index >= value.length),
+            stringNavigator = {
+                CurrentCharacter: bPastEndOfContent ? null : value.charAt(index),
+                IsWhitespace: bPastEndOfContent ? false : /\s/.test(value.charAt(index)),
+                DoesCurrentContentMatch: function (checkFor) {
+                    if (!checkFor) {
                         return false;
                     }
-                    return strValue.substr(intIndex, strCheckFor.length) === strCheckFor;
+                    return value.substr(index, checkFor.length) === checkFor;
                 }
             };
         if (bPastEndOfContent) {
-            objStringNavigator.GetNext = function () {
-                return objStringNavigator;
+            stringNavigator.GetNext = function () {
+                return stringNavigator;
             };
         } else {
-            objStringNavigator.GetNext = function () {
-                return getCharacterPositionStringNavigator(strValue, intIndex + 1);
+            stringNavigator.GetNext = function () {
+                return getCharacterPositionStringNavigator(value, index + 1);
             };
         }
-        return objStringNavigator;
+        return stringNavigator;
     };
     
-    processCharacters = function (objProcessor, strValue) {
-        var objCharacterResult,
-            arrAllCharacterResults = [],
-            objStringNavigator = getCharacterPositionStringNavigator(strValue, 0);
-        while (objStringNavigator.CurrentCharacter) {
-            objCharacterResult = objProcessor.Process(objStringNavigator);
-            arrAllCharacterResults.push({
-                Character: objStringNavigator.CurrentCharacter,
-                CharacterCategorisation: objCharacterResult.CharacterCategorisation
+    processCharacters = function (processor, value) {
+        var characterResultDetails,
+            allCharacterResultDetails = [],
+            stringNavigator = getCharacterPositionStringNavigator(value, 0);
+        while (stringNavigator.CurrentCharacter) {
+            characterResultDetails = processor.Process(stringNavigator);
+            allCharacterResultDetails.push({
+                Character: stringNavigator.CurrentCharacter,
+                CharacterCategorisation: characterResultDetails.CharacterCategorisation
             });
-            objStringNavigator = objStringNavigator.GetNext();
-            objProcessor = objCharacterResult.NextProcessor;
+            stringNavigator = stringNavigator.GetNext();
+            processor = characterResultDetails.NextProcessor;
         }
-        return arrAllCharacterResults;
+        return allCharacterResultDetails;
     };
     
     groupCharacters = function (arrCategorisedCharacters) {
-        var arrStrings = [],
-            objCharacterBuffer = {
+        var groupedCharacterStrings = [],
+            characterResultDetails = {
                 CharacterCategorisation: null,
                 Characters: [],
                 IndexInSource: null
             };
         
-        arrCategorisedCharacters.forEach(function (objCategorisedCharacter, intIndex) {
-            var bCharacterShouldNotBeGrouped = (
-                (objCategorisedCharacter.CharacterCategorisation === CharacterCategorisationOptions.CloseBrace) ||
-                (objCategorisedCharacter.CharacterCategorisation === CharacterCategorisationOptions.OpenBrace) ||
-                (objCategorisedCharacter.CharacterCategorisation === CharacterCategorisationOptions.SemiColon)
+        arrCategorisedCharacters.forEach(function (categorisedCharacterDetails, index) {
+            var characterShouldNotBeGrouped = (
+                (categorisedCharacterDetails.CharacterCategorisation === CharacterCategorisationOptions.CloseBrace) ||
+                (categorisedCharacterDetails.CharacterCategorisation === CharacterCategorisationOptions.OpenBrace) ||
+                (categorisedCharacterDetails.CharacterCategorisation === CharacterCategorisationOptions.SemiColon)
             );
-            if ((objCategorisedCharacter.CharacterCategorisation === objCharacterBuffer.CharacterCategorisation) && !bCharacterShouldNotBeGrouped) {
-                objCharacterBuffer.Characters.push(objCategorisedCharacter.Character);
+            if ((categorisedCharacterDetails.CharacterCategorisation === characterResultDetails.CharacterCategorisation) && !characterShouldNotBeGrouped) {
+                characterResultDetails.Characters.push(categorisedCharacterDetails.Character);
                 return;
             }
             
-            if (objCharacterBuffer.Characters.length > 0) {
-                arrStrings.push({
-                    CharacterCategorisation: objCharacterBuffer.CharacterCategorisation,
-                    Value: objCharacterBuffer.Characters.join(""),
-                    IndexInSource: objCharacterBuffer.IndexInSource
+            if (characterResultDetails.Characters.length > 0) {
+                groupedCharacterStrings.push({
+                    CharacterCategorisation: characterResultDetails.CharacterCategorisation,
+                    Value: characterResultDetails.Characters.join(""),
+                    IndexInSource: characterResultDetails.IndexInSource
                 });
             }
             
-            if (bCharacterShouldNotBeGrouped) {
-                arrStrings.push({
-                    CharacterCategorisation: objCategorisedCharacter.CharacterCategorisation,
-                    Value: objCategorisedCharacter.Character,
-                    IndexInSource: intIndex
+            if (characterShouldNotBeGrouped) {
+                groupedCharacterStrings.push({
+                    CharacterCategorisation: categorisedCharacterDetails.CharacterCategorisation,
+                    Value: categorisedCharacterDetails.Character,
+                    IndexInSource: index
                 });
-                objCharacterBuffer = {
+                characterResultDetails = {
                     CharacterCategorisation: null,
                     Characters: [],
                     IndexInSource: null
                 };
             } else {
-                objCharacterBuffer = {
-                    CharacterCategorisation: objCategorisedCharacter.CharacterCategorisation,
-                    Characters: [ objCategorisedCharacter.Character ],
-                    IndexInSource: intIndex
+                characterResultDetails = {
+                    CharacterCategorisation: categorisedCharacterDetails.CharacterCategorisation,
+                    Characters: [ categorisedCharacterDetails.Character ],
+                    IndexInSource: index
                 };
             }
         });
         
-        if (objCharacterBuffer.Characters.length > 0) {
-            arrStrings.push({
-                CharacterCategorisation: objCharacterBuffer.CharacterCategorisation,
-                Value: objCharacterBuffer.Characters.join(""),
-                IndexInSource: objCharacterBuffer.IndexInSource
+        if (characterResultDetails.Characters.length > 0) {
+            groupedCharacterStrings.push({
+                CharacterCategorisation: characterResultDetails.CharacterCategorisation,
+                Value: characterResultDetails.Characters.join(""),
+                IndexInSource: characterResultDetails.IndexInSource
             });
         }
         
-        return arrStrings;
+        return groupedCharacterStrings;
     };
     
     CssParserJs = {
         CharacterCategorisationOptions: CharacterCategorisationOptions,
         ParseError: ParseError,
-        ParseCss: function (strValue) {
-            return groupCharacters(processCharacters(objCharacterProcessors.GetNewCssProcessor(), strValue));
+        ParseCss: function (value) {
+            return groupCharacters(processCharacters(characterProcessors.GetNewCssProcessor(), value));
         },
-        ParseLess: function (strValue) {
-            return groupCharacters(processCharacters(objCharacterProcessors.GetNewLessProcessor(), strValue));
+        ParseLess: function (value) {
+            return groupCharacters(processCharacters(characterProcessors.GetNewLessProcessor(), value));
         }
     };
 
     // Now that the CssParserJs reference has been prepared, with the basic character categorisation, the next layer is added to the API, where
     // content is parsed into a hierarchical structure
     (function () {
-        var objSelectorBreaker,
+        var selectorBreaker,
             objHierarchicalParser,
             FragmentCategorisationOptions;
 
-        objSelectorBreaker = (function () {
+        selectorBreaker = (function () {
             var CharacterCategorisationOptions,
                 getSelectorProcessorResult,
                 getDefaultSelectorProcessor,
@@ -547,99 +547,99 @@
                 SelectorSegment: 2
             };
 
-            getSelectorProcessorResult = function (intCharacterCategorisation, objNextProcessor) {
+            getSelectorProcessorResult = function (characterCategorisation, nextProcessor) {
                 return {
-                    CharacterCategorisation: intCharacterCategorisation,
-                    NextProcessor: objNextProcessor
+                    CharacterCategorisation: characterCategorisation,
+                    NextProcessor: nextProcessor
                 };
             };
 
             getDefaultSelectorProcessor = function () {
-                var objProcessor = {
-                    Process: function (chrCurrent) {
-                        if (/\s/.test(chrCurrent)) {
-                            return getSelectorProcessorResult(CharacterCategorisationOptions.EndOfSelectorSegment, objProcessor);
-                        } else if (chrCurrent === ",") {
-                            return getSelectorProcessorResult(CharacterCategorisationOptions.EndOfSelector, objProcessor);
-                        } else if (chrCurrent === "[") {
-                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, getAttributeSelectorProcessor(objProcessor));
+                var processor = {
+                    Process: function (currentCharacter) {
+                        if (/\s/.test(currentCharacter)) {
+                            return getSelectorProcessorResult(CharacterCategorisationOptions.EndOfSelectorSegment, processor);
+                        } else if (currentCharacter === ",") {
+                            return getSelectorProcessorResult(CharacterCategorisationOptions.EndOfSelector, processor);
+                        } else if (currentCharacter === "[") {
+                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, getAttributeSelectorProcessor(processor));
                         } else {
-                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, objProcessor);
+                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, processor);
                         }
                     }
                 };
-                return objProcessor;
+                return processor;
             };
 
-            getAttributeSelectorProcessor = function (objProcessorToReturnTo) {
-                var objProcessor = {
-                    Process: function (chrCurrent) {
-                        if ((chrCurrent === "\"") || (chrCurrent === "'")) {
-                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, getQuotedSelectorProcessor(objProcessor, chrCurrent, false));
-                        } else if (chrCurrent === "]") {
-                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, objProcessorToReturnTo);
+            getAttributeSelectorProcessor = function (processorToReturnTo) {
+                var processor = {
+                    Process: function (currentCharacter) {
+                        if ((currentCharacter === "\"") || (currentCharacter === "'")) {
+                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, getQuotedSelectorProcessor(processor, currentCharacter, false));
+                        } else if (currentCharacter === "]") {
+                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, processorToReturnTo);
                         } else {
-                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, objProcessor);
+                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, processor);
                         }
                     }
                 };
-                return objProcessor;
+                return processor;
             };
 
-            getQuotedSelectorProcessor = function (objProcessorToReturnTo, chrQuoteCharacter, bNextCharacterIsEscaped) {
-                var objProcessor = {
-                    Process: function (chrCurrent) {
-                        if (bNextCharacterIsEscaped) {
-                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, getQuotedSelectorProcessor(objProcessor, chrCurrent, false));
-                        } else if (chrCurrent === chrQuoteCharacter) {
-                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, objProcessorToReturnTo);
+            getQuotedSelectorProcessor = function (processorToReturnTo, quoteCharacterCharacter, nextCharacterIsEscaped) {
+                var processor = {
+                    Process: function (currentCharacter) {
+                        if (nextCharacterIsEscaped) {
+                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, getQuotedSelectorProcessor(processor, currentCharacter, false));
+                        } else if (currentCharacter === quoteCharacterCharacter) {
+                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, processorToReturnTo);
                         } else {
-                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, objProcessor);
+                            return getSelectorProcessorResult(CharacterCategorisationOptions.SelectorSegment, processor);
                         }
                     }
                 };
-                return objProcessor;
+                return processor;
             };
 
             return {
                 Break: function (strSelector) {
-                    var arrSelectors = [],
-                        arrSelectorBuffer = [],
-                        arrSelectorSegmentBuffer = [],
-                        objProcessor = getDefaultSelectorProcessor(),
-                        objSelectorProcessorResult;
+                    var selectors = [],
+                        selectorBuffer = [],
+                        selectorsegmentBuffer = [],
+                        processor = getDefaultSelectorProcessor(),
+                        selectorProcessorResult;
 
                     // Include an extra character on the end so that there's an extra pass through the loop where the EndOfSelector categorisation is specified (and the
                     // extra character ignored)
-                    strSelector.split("").concat([" "]).forEach(function (chrCurrent, intIndex) {
-                        if (intIndex === strSelector.length) {
-                            objSelectorProcessorResult = getSelectorProcessorResult(CharacterCategorisationOptions.EndOfSelector, objProcessor);
+                    strSelector.split("").concat([" "]).forEach(function (currentCharacter, index) {
+                        if (index === strSelector.length) {
+                            selectorProcessorResult = getSelectorProcessorResult(CharacterCategorisationOptions.EndOfSelector, processor);
                         } else {
-                            objSelectorProcessorResult = objProcessor.Process(chrCurrent);
+                            selectorProcessorResult = processor.Process(currentCharacter);
                         }
-                        if (objSelectorProcessorResult.CharacterCategorisation === CharacterCategorisationOptions.SelectorSegment) {
-                            arrSelectorSegmentBuffer.push(chrCurrent);
-                        } else if (objSelectorProcessorResult.CharacterCategorisation === CharacterCategorisationOptions.EndOfSelectorSegment) {
-                            if (arrSelectorSegmentBuffer.length > 0) {
-                                arrSelectorBuffer.push(arrSelectorSegmentBuffer.join(""));
-                                arrSelectorSegmentBuffer = [];
+                        if (selectorProcessorResult.CharacterCategorisation === CharacterCategorisationOptions.SelectorSegment) {
+                            selectorsegmentBuffer.push(currentCharacter);
+                        } else if (selectorProcessorResult.CharacterCategorisation === CharacterCategorisationOptions.EndOfSelectorSegment) {
+                            if (selectorsegmentBuffer.length > 0) {
+                                selectorBuffer.push(selectorsegmentBuffer.join(""));
+                                selectorsegmentBuffer = [];
                             }
-                        } else if (objSelectorProcessorResult.CharacterCategorisation === CharacterCategorisationOptions.EndOfSelector) {
-                            if (arrSelectorSegmentBuffer.length > 0) {
-                                arrSelectorBuffer.push(arrSelectorSegmentBuffer.join(""));
-                                arrSelectorSegmentBuffer = [];
+                        } else if (selectorProcessorResult.CharacterCategorisation === CharacterCategorisationOptions.EndOfSelector) {
+                            if (selectorsegmentBuffer.length > 0) {
+                                selectorBuffer.push(selectorsegmentBuffer.join(""));
+                                selectorsegmentBuffer = [];
                             }
-                            if (arrSelectorBuffer.length > 0) {
-                                arrSelectors.push(arrSelectorBuffer);
-                                arrSelectorBuffer = [];
+                            if (selectorBuffer.length > 0) {
+                                selectors.push(selectorBuffer);
+                                selectorBuffer = [];
                             }
                         } else {
-                            throw new ParseError("Unsupported CharacterCategorisationOptions: " + objSelectorProcessorResult.CharacterCategorisation, intIndex);
+                            throw new ParseError("Unsupported CharacterCategorisationOptions: " + selectorProcessorResult.CharacterCategorisation, index);
                         }
 
-                        objProcessor = objSelectorProcessorResult.NextProcessor;
+                        processor = selectorProcessorResult.NextProcessor;
                     });
-                    return arrSelectors;
+                    return selectors;
                 }
             };
         }());
@@ -654,57 +654,57 @@
                 forceIntoMultiLineComment,
                 parseIntoStructuredDataPartial;
 
-            getSegmentEnumerator = function (arrSegments) {
-                var intIndex = -1;
+            getSegmentEnumerator = function (segments) {
+                var index = -1;
                 return {
                     GetCurrent: function () {
-                        return ((intIndex < 0) || (intIndex >= arrSegments.length)) ? null : arrSegments[intIndex];
+                        return ((index < 0) || (index >= segments.length)) ? null : segments[index];
                     },
                     MoveNext: function () {
-                        if (intIndex < arrSegments.length) {
-                            intIndex = intIndex + 1;
+                        if (index < segments.length) {
+                            index = index + 1;
                         }
-                        return (intIndex < arrSegments.length);
+                        return (index < segments.length);
                     },
                     TryToPeekAhead: function (positiveOffsetToPeekFor) {
-                        var peekIndex = intIndex + positiveOffsetToPeekFor;
-                        if (peekIndex >= arrSegments.length) {
+                        var peekIndex = index + positiveOffsetToPeekFor;
+                        if (peekIndex >= segments.length) {
                             return {
                                 Success: false
                             };
                         }
                         return {
                             Success: true,
-                            Value: arrSegments[peekIndex]
+                            Value: segments[peekIndex]
                         };
                     }
                 };
             };
 
             getPropertyValueBuffer = function () {
-                var objStylePropertyValue = null;
+                var stylePropertyValue = null;
                 return {
-                    Add: function (objLastStylePropertyName, strPropertyValueSegment, intSourceLineIndex) {
-                        if (objStylePropertyValue) {
-                            objStylePropertyValue.Values.push(strPropertyValueSegment);
+                    Add: function (lastStylePropertyName, propertyValueSegment, sourceLineIndex) {
+                        if (stylePropertyValue) {
+                            stylePropertyValue.Values.push(propertyValueSegment);
                         } else {
-                            objStylePropertyValue = {
+                            stylePropertyValue = {
                                 FragmentCategorisation: FragmentCategorisationOptions.StylePropertyValue,
-                                Property: objLastStylePropertyName,
-                                Values: [strPropertyValueSegment],
-                                SourceLineIndex: intSourceLineIndex
+                                Property: lastStylePropertyName,
+                                Values: [propertyValueSegment],
+                                SourceLineIndex: sourceLineIndex
                             };
                         }
                     },
                     GetHasContent: function () {
-                        return !!objStylePropertyValue;
+                        return !!stylePropertyValue;
                     },
                     ExtractCombinedContentAndClear: function () {
-                        if (!objStylePropertyValue) {
+                        if (!stylePropertyValue) {
                             throw new Error("No content to retrieve");
                         }
-                        var objValueToReturn = objStylePropertyValue;
-                        objStylePropertyValue = null;
+                        var objValueToReturn = stylePropertyValue;
+                        stylePropertyValue = null;
                         return objValueToReturn;
                     }
                 };
@@ -712,23 +712,23 @@
 
             getSelectorSet = function (strSelectors) {
                 // Using the SelectorBreaker means that any quoting, square brackets or other escaping is taken into account
-                var arrSelectors = objSelectorBreaker.Break(strSelectors),
-                    arrTidiedSelectors = [];
-                arrSelectors.forEach(function (arrSelectorSegments) {
-                    arrTidiedSelectors.push(arrSelectorSegments.join(" "));
+                var selectors = selectorBreaker.Break(strSelectors),
+                    tidiedSelectors = [];
+                selectors.forEach(function (selectorsegments) {
+                    tidiedSelectors.push(selectorsegments.join(" "));
                 });
-                return arrTidiedSelectors;
+                return tidiedSelectors;
             };
 
-            trim = function (strValue) {
-                return strValue.trim ? strValue.trim() : strValue.replace(/^\s+|\s+$/g, "");
+            trim = function (value) {
+                return value.trim ? value.trim() : value.replace(/^\s+|\s+$/g, "");
             };
 
-            getNumberOfLineReturnsFromContentIfAny = function (strValue) {
-                if ((strValue.indexOf("\r") === -1) && (strValue.indexOf("\n") === -1)) {
+            getNumberOfLineReturnsFromContentIfAny = function (value) {
+                if ((value.indexOf("\r") === -1) && (value.indexOf("\n") === -1)) {
                     return 0;
                 }
-                return strValue.match(/\r\n|\r|\n/g).length;
+                return value.match(/\r\n|\r|\n/g).length;
             };
             
             isCommentWithinStylePropertyValue = function (previousFragmentIfAny, segmentEnumerator) {
@@ -772,226 +772,226 @@
                 return commentValue;
             };
 
-            parseIntoStructuredDataPartial = function (objSegmentEnumerator, bExcludeComments, arrParentSelectorSets, intDepth, intSourceLineIndex) {
-                var intStartingSourceLineIndex = intSourceLineIndex,
-                    arrFragments = [],
-                    arrSelectorOrStyleContentBuffer = [],
-                    intSelectorOrStyleStartSourceLineIndex = -1,
-                    objLastStylePropertyName = null,
-                    objStylePropertyValueBuffer = getPropertyValueBuffer(),
-                    objSegment,
-                    arrSelectors,
-                    objParsedNestedData,
-                    strSelectorOrStyleContent;
+            parseIntoStructuredDataPartial = function (segmentEnumerator, excludeComments, parentSelectorSets, depth, sourceLineIndex) {
+                var startingSourceLineIndex = sourceLineIndex,
+                    fragments = [],
+                    selectorOrStyleContentBuffer = [],
+                    selectorOrStyleStartSourceLineIndex = -1,
+                    lastStylePropertyName = null,
+                    stylePropertyValueBuffer = getPropertyValueBuffer(),
+                    currentSegment,
+                    selectors,
+                    parsedNestedData,
+                    selectorOrStyleContent;
 
-                while (objSegmentEnumerator.MoveNext()) {
-                    objSegment = objSegmentEnumerator.GetCurrent();
-                    switch (objSegment.CharacterCategorisation) {
+                while (segmentEnumerator.MoveNext()) {
+                    currentSegment = segmentEnumerator.GetCurrent();
+                    switch (currentSegment.CharacterCategorisation) {
 
                     case CssParserJs.CharacterCategorisationOptions.Comment:
-                        if (!bExcludeComments) {
-                            if (isCommentWithinStylePropertyValue(arrFragments.length > 0 ? arrFragments[arrFragments.length - 1] : null, objSegmentEnumerator)) {
+                        if (!excludeComments) {
+                            if (isCommentWithinStylePropertyValue(fragments.length > 0 ? fragments[fragments.length - 1] : null, segmentEnumerator)) {
                                 // If this comment is a commented-out section of a property value (eg. "color: /*red*/ value;") then, in order to accurately represent
                                 // the input in the model that we have (that groups style property values together into a single fragment, along with a reference to
                                 // the style property name), the comment has to be considered part of the style property value. If this behaviour is not desired
                                 // (if, for example, this parsing step is used to minify content) then the argument may be set that excludes comments.
-                                objStylePropertyValueBuffer.Add(objLastStylePropertyName, forceIntoMultiLineComment(objSegment.Value), intSelectorOrStyleStartSourceLineIndex);
+                                stylePropertyValueBuffer.Add(lastStylePropertyName, forceIntoMultiLineComment(currentSegment.Value), selectorOrStyleStartSourceLineIndex);
                             } else {
-                                if (objStylePropertyValueBuffer.GetHasContent()) {
-                                    arrFragments.push(objStylePropertyValueBuffer.ExtractCombinedContentAndClear());
+                                if (stylePropertyValueBuffer.GetHasContent()) {
+                                    fragments.push(stylePropertyValueBuffer.ExtractCombinedContentAndClear());
                                 }
-                                arrFragments.push({
+                                fragments.push({
                                     FragmentCategorisation: FragmentCategorisationOptions.Comment,
-                                    Value: objSegment.Value,
-                                    SourceLineIndex: intSourceLineIndex
+                                    Value: currentSegment.Value,
+                                    SourceLineIndex: sourceLineIndex
                                 });
                             }
                         }
-                        intSourceLineIndex += getNumberOfLineReturnsFromContentIfAny(objSegment.Value);
+                        sourceLineIndex += getNumberOfLineReturnsFromContentIfAny(currentSegment.Value);
                         break;
 
                     case CssParserJs.CharacterCategorisationOptions.Whitespace:
-                        if (arrSelectorOrStyleContentBuffer.length > 0) {
-                            arrSelectorOrStyleContentBuffer.push(" ");
+                        if (selectorOrStyleContentBuffer.length > 0) {
+                            selectorOrStyleContentBuffer.push(" ");
                         }
-                        intSourceLineIndex += getNumberOfLineReturnsFromContentIfAny(objSegment.Value);
+                        sourceLineIndex += getNumberOfLineReturnsFromContentIfAny(currentSegment.Value);
                         break;
 
                     case CssParserJs.CharacterCategorisationOptions.SelectorOrStyleProperty:
-                        if (arrSelectorOrStyleContentBuffer.length === 0) {
-                            intSelectorOrStyleStartSourceLineIndex = intSourceLineIndex;
+                        if (selectorOrStyleContentBuffer.length === 0) {
+                            selectorOrStyleStartSourceLineIndex = sourceLineIndex;
                         }
-                        arrSelectorOrStyleContentBuffer.push(objSegment.Value);
+                        selectorOrStyleContentBuffer.push(currentSegment.Value);
 
                         // If we were building up content for a StylePropertyValue then encountering other content means that the value must have terminated (for valid
                         // CSS it should be only a semicolon or close brace that terminates a value but we're not concerned about invalid CSS here)
-                        if (objStylePropertyValueBuffer.GetHasContent()) {
-                            arrFragments.push(objStylePropertyValueBuffer.ExtractCombinedContentAndClear());
+                        if (stylePropertyValueBuffer.GetHasContent()) {
+                            fragments.push(stylePropertyValueBuffer.ExtractCombinedContentAndClear());
                         }
                         break;
 
                     case CssParserJs.CharacterCategorisationOptions.OpenBrace:
-                        if (arrSelectorOrStyleContentBuffer.length === 0) {
-                            throw new ParseError("Encountered OpenBrace with no preceding selector", objSegment.IndexInSource);
+                        if (selectorOrStyleContentBuffer.length === 0) {
+                            throw new ParseError("Encountered OpenBrace with no preceding selector", currentSegment.IndexInSource);
                         }
 
                         // If we were building up content for a StylePropertyValue then encountering other content means that the value must have terminated (for valid
                         // CSS it should be only a semicolon or close brace that terminates a value but we're not concerned about invalid CSS here)
-                        if (objStylePropertyValueBuffer.GetHasContent()) {
-                            arrFragments.push(objStylePropertyValueBuffer.ExtractCombinedContentAndClear());
+                        if (stylePropertyValueBuffer.GetHasContent()) {
+                            fragments.push(stylePropertyValueBuffer.ExtractCombinedContentAndClear());
                         }
 
-                        arrSelectors = getSelectorSet(arrSelectorOrStyleContentBuffer.join(""));
-                        if (arrSelectors.length === 0) {
-                            throw new ParseError("Open brace encountered with no leading selector content", objSegment.IndexInSource);
+                        selectors = getSelectorSet(selectorOrStyleContentBuffer.join(""));
+                        if (selectors.length === 0) {
+                            throw new ParseError("Open brace encountered with no leading selector content", currentSegment.IndexInSource);
                         }
-                        objParsedNestedData = parseIntoStructuredDataPartial(
-                            objSegmentEnumerator,
-                            bExcludeComments,
-                            arrParentSelectorSets.concat([arrSelectors]),
-                            intDepth + 1,
-                            intSourceLineIndex
+                        parsedNestedData = parseIntoStructuredDataPartial(
+                            segmentEnumerator,
+                            excludeComments,
+                            parentSelectorSets.concat([selectors]),
+                            depth + 1,
+                            sourceLineIndex
                         );
-                        arrFragments.push({
-                            FragmentCategorisation: (arrSelectors[0].toLowerCase().substring(0, 6) === "@media")
+                        fragments.push({
+                            FragmentCategorisation: (selectors[0].toLowerCase().substring(0, 6) === "@media")
                                 ? FragmentCategorisationOptions.MediaQuery
                                 : FragmentCategorisationOptions.Selector,
-                            ParentSelectors: arrParentSelectorSets,
-                            Selectors: arrSelectors,
-                            ChildFragments: objParsedNestedData.Fragments,
-                            SourceLineIndex: intSelectorOrStyleStartSourceLineIndex
+                            ParentSelectors: parentSelectorSets,
+                            Selectors: selectors,
+                            ChildFragments: parsedNestedData.Fragments,
+                            SourceLineIndex: selectorOrStyleStartSourceLineIndex
                         });
-                        intSourceLineIndex += objParsedNestedData.NumberOfLinesParsed;
-                        arrSelectorOrStyleContentBuffer = [];
+                        sourceLineIndex += parsedNestedData.NumberOfLinesParsed;
+                        selectorOrStyleContentBuffer = [];
                         break;
 
                     case CssParserJs.CharacterCategorisationOptions.CloseBrace:
-                        if (intDepth === 0) {
-                            throw new ParseError("Encountered unexpected close brace", objSegment.IndexInSource);
+                        if (depth === 0) {
+                            throw new ParseError("Encountered unexpected close brace", currentSegment.IndexInSource);
                         }
                             
                         // If we were building up content for a StylePropertyValue then encountering other content means that the value must have terminated (for valid
                         // CSS it should be only a semicolon or close brace that terminates a value but we're not concerned about invalid CSS here)
-                        if (objStylePropertyValueBuffer.GetHasContent()) {
-                            arrFragments.push(objStylePropertyValueBuffer.ExtractCombinedContentAndClear());
+                        if (stylePropertyValueBuffer.GetHasContent()) {
+                            fragments.push(stylePropertyValueBuffer.ExtractCombinedContentAndClear());
                         }
 
-                        if (arrSelectorOrStyleContentBuffer.length > 0) {
-                            arrFragments.push({
+                        if (selectorOrStyleContentBuffer.length > 0) {
+                            fragments.push({
                                 FragmentCategorisation: FragmentCategorisationOptions.StylePropertyName,
-                                Value: arrSelectorOrStyleContentBuffer.join(""),
-                                SourceLineIndex: intSelectorOrStyleStartSourceLineIndex
+                                Value: selectorOrStyleContentBuffer.join(""),
+                                SourceLineIndex: selectorOrStyleStartSourceLineIndex
                             });
                         }
                         return {
-                            Fragments: arrFragments,
-                            NumberOfLinesParsed: intSourceLineIndex - intStartingSourceLineIndex
+                            Fragments: fragments,
+                            NumberOfLinesParsed: sourceLineIndex - startingSourceLineIndex
                         };
 
                     case CssParserJs.CharacterCategorisationOptions.StylePropertyColon:
                     case CssParserJs.CharacterCategorisationOptions.SemiColon:
                         // If we were building up content for a StylePropertyValue then encountering other content means that the value must have terminated (for valid
                         // CSS it should be only a semicolon or close brace that terminates a value but we're not concerned about invalid CSS here)
-                        if (objStylePropertyValueBuffer.GetHasContent()) {
-                            arrFragments.push(objStylePropertyValueBuffer.ExtractCombinedContentAndClear());
+                        if (stylePropertyValueBuffer.GetHasContent()) {
+                            fragments.push(stylePropertyValueBuffer.ExtractCombinedContentAndClear());
                         }
 
-                        if (arrSelectorOrStyleContentBuffer.length > 0) {
-                            strSelectorOrStyleContent = arrSelectorOrStyleContentBuffer.join("");
-                            if (strSelectorOrStyleContent.toLowerCase().substring(0, 7) === "@import") {
-                                arrFragments.push({
+                        if (selectorOrStyleContentBuffer.length > 0) {
+                            selectorOrStyleContent = selectorOrStyleContentBuffer.join("");
+                            if (selectorOrStyleContent.toLowerCase().substring(0, 7) === "@import") {
+                                fragments.push({
                                     FragmentCategorisation: FragmentCategorisationOptions.Import,
-                                    Value: trim(strSelectorOrStyleContent.substring(7)),
-                                    SourceLineIndex: intSourceLineIndex
+                                    Value: trim(selectorOrStyleContent.substring(7)),
+                                    SourceLineIndex: sourceLineIndex
                                 });
-                                arrSelectorOrStyleContentBuffer = [];
+                                selectorOrStyleContentBuffer = [];
                                 break;
                             }
 
                             // Note: The SemiColon case here probably suggests invalid content, it should only follow a Value segment (ignoring  Comments and WhiteSpace),
                             // so if there is anything in the selectorOrStyleContentBuffer before the SemiColon then it's probably not correct (but we're not validating
                             // for that here, we just don't want to throw anything away!)
-                            objLastStylePropertyName = {
+                            lastStylePropertyName = {
                                 FragmentCategorisation: FragmentCategorisationOptions.StylePropertyName,
-                                Value: arrSelectorOrStyleContentBuffer.join(""),
-                                SourceLineIndex: intSelectorOrStyleStartSourceLineIndex
+                                Value: selectorOrStyleContentBuffer.join(""),
+                                SourceLineIndex: selectorOrStyleStartSourceLineIndex
                             };
-                            arrFragments.push(objLastStylePropertyName);
-                            arrSelectorOrStyleContentBuffer = [];
+                            fragments.push(lastStylePropertyName);
+                            selectorOrStyleContentBuffer = [];
                         }
                         break;
 
                     case CssParserJs.CharacterCategorisationOptions.Value:
-                        if (arrSelectorOrStyleContentBuffer.length > 0) {
-                            strSelectorOrStyleContent = arrSelectorOrStyleContentBuffer.join("");
-                            if (strSelectorOrStyleContent.toLowerCase().substring(0, 7) === "@import") {
-                                arrSelectorOrStyleContentBuffer.push(objSegment.Value);
+                        if (selectorOrStyleContentBuffer.length > 0) {
+                            selectorOrStyleContent = selectorOrStyleContentBuffer.join("");
+                            if (selectorOrStyleContent.toLowerCase().substring(0, 7) === "@import") {
+                                selectorOrStyleContentBuffer.push(currentSegment.Value);
                                 break;
                             }
 
                             // This is presumably an error condition, there should be a colon between SelectorOrStyleProperty content and Value content, but we're not
                             // validating here so just lump it all together
-                            objLastStylePropertyName = {
+                            lastStylePropertyName = {
                                 FragmentCategorisation: FragmentCategorisationOptions.StylePropertyName,
-                                Value: arrSelectorOrStyleContentBuffer.join(""),
-                                SourceLineIndex: intSelectorOrStyleStartSourceLineIndex
+                                Value: selectorOrStyleContentBuffer.join(""),
+                                SourceLineIndex: selectorOrStyleStartSourceLineIndex
                             };
-                            arrFragments.push(objLastStylePropertyName);
-                            arrSelectorOrStyleContentBuffer = [];
+                            fragments.push(lastStylePropertyName);
+                            selectorOrStyleContentBuffer = [];
                         }
-                        if (!objLastStylePropertyName) {
-                            throw new ParseError("Invalid content, orphan style property value encountered", objSegment.IndexInSource);
+                        if (!lastStylePropertyName) {
+                            throw new ParseError("Invalid content, orphan style property value encountered", currentSegment.IndexInSource);
                         }
-                        objStylePropertyValueBuffer.Add(objLastStylePropertyName, objSegment.Value, intSelectorOrStyleStartSourceLineIndex);
+                        stylePropertyValueBuffer.Add(lastStylePropertyName, currentSegment.Value, selectorOrStyleStartSourceLineIndex);
                         break;
 
                     default:
-                        throw new ParseError("Unsupported CharacterCategorisationOptions value: " + objSegment.CharacterCategorisation, objSegment.IndexInSource);
+                        throw new ParseError("Unsupported CharacterCategorisationOptions value: " + currentSegment.CharacterCategorisation, currentSegment.IndexInSource);
                     }
                 }
 
                 // If we have any content in the selectorOrStyleContentBuffer and we're hitting a CloseBrace then it's probably invalid content but just stash it away
                 // and move on! (The purpose of this work isn't to get too nuts about invalid CSS).
-                if (arrSelectorOrStyleContentBuffer.length > 0) {
-                    arrSelectors = getSelectorSet(arrSelectorOrStyleContentBuffer.join(""));
-                    arrFragments.push({
-                        FragmentCategorisation: (arrSelectors[0].Value.toLowerCase().substring(0, 6) === "@media")
+                if (selectorOrStyleContentBuffer.length > 0) {
+                    selectors = getSelectorSet(selectorOrStyleContentBuffer.join(""));
+                    fragments.push({
+                        FragmentCategorisation: (selectors[0].Value.toLowerCase().substring(0, 6) === "@media")
                             ? FragmentCategorisationOptions.MediaQuery
                             : FragmentCategorisationOptions.Selector,
-                        ParentSelectors: arrParentSelectorSets,
-                        Selectors: arrSelectors,
+                        ParentSelectors: parentSelectorSets,
+                        Selectors: selectors,
                         ChildFragments: [],
-                        SourceLineIndex: intSourceLineIndex
+                        SourceLineIndex: sourceLineIndex
                     });
                 }
 
                 // It's very feasible that there will still be some style property value content in the buffer at this point, so ensure it doesn't get lost
-                if (objStylePropertyValueBuffer.GetHasContent()) {
-                    arrFragments.push(objStylePropertyValueBuffer.ExtractCombinedContentAndClear());
+                if (stylePropertyValueBuffer.GetHasContent()) {
+                    fragments.push(stylePropertyValueBuffer.ExtractCombinedContentAndClear());
                 }
 
                 return {
-                    Fragments: arrFragments,
-                    NumberOfLinesParsed: intSourceLineIndex - intStartingSourceLineIndex
+                    Fragments: fragments,
+                    NumberOfLinesParsed: sourceLineIndex - startingSourceLineIndex
                 };
             };
 
             return {
-                ParseIntoStructuredData: function (arrSegments, bExcludeComments) {
-                    var objSegmentEnumerator = getSegmentEnumerator(arrSegments),
-                        objParsedData = parseIntoStructuredDataPartial(objSegmentEnumerator, bExcludeComments, [], 0, 0),
-                        objSegment,
+                ParseIntoStructuredData: function (segments, excludeComments) {
+                    var segmentEnumerator = getSegmentEnumerator(segments),
+                        objParsedData = parseIntoStructuredDataPartial(segmentEnumerator, excludeComments, [], 0, 0),
+                        currentSegment,
                         intLastFragmentLineIndex;
-                    while (objSegmentEnumerator.MoveNext()) {
-                        objSegment = objSegmentEnumerator.GetCurrent();
-                        if ((objSegment.CharacterCategorisation !== CssParserJs.CharacterCategorisationOptions.Comment)
-                                && (objSegment.CharacterCategorisation !== CssParserJs.CharacterCategorisationOptions.Whitespace)) {
+                    while (segmentEnumerator.MoveNext()) {
+                        currentSegment = segmentEnumerator.GetCurrent();
+                        if ((currentSegment.CharacterCategorisation !== CssParserJs.CharacterCategorisationOptions.Comment)
+                                && (currentSegment.CharacterCategorisation !== CssParserJs.CharacterCategorisationOptions.Whitespace)) {
                             if (objParsedData.Fragments.length > 0) {
                                 intLastFragmentLineIndex = objParsedData.Fragments[objParsedData.Fragments.length - 1].SourceLineIndex;
                             } else {
                                 intLastFragmentLineIndex = 0;
                             }
-                            throw new ParseError("Encountered unexpected content - this is often caused by mismatched opening or closing braces", objSegment.IndexInSource);
+                            throw new ParseError("Encountered unexpected content - this is often caused by mismatched opening or closing braces", currentSegment.IndexInSource);
                         }
                     }
                     return objParsedData.Fragments;
@@ -1006,25 +1006,25 @@
             Selector: 3,
             StylePropertyName: 4,
             StylePropertyValue: 5,
-            GetNameFor: function (intValue) {
-                var strPropertyName;
-                for (strPropertyName in FragmentCategorisationOptions) {
-                    if (FragmentCategorisationOptions.hasOwnProperty(strPropertyName)) {
-                        if (FragmentCategorisationOptions[strPropertyName] === intValue) {
-                            return strPropertyName;
+            GetNameFor: function (value) {
+                var propertyName;
+                for (propertyName in FragmentCategorisationOptions) {
+                    if (FragmentCategorisationOptions.hasOwnProperty(propertyName)) {
+                        if (FragmentCategorisationOptions[propertyName] === value) {
+                            return propertyName;
                         }
                     }
                 }
-                throw new Error("Invalid FragmentCategorisationOptions: " + intValue);
+                throw new Error("Invalid FragmentCategorisationOptions: " + value);
             }
         };
 
         CssParserJs.ExtendedLessParser = {
-            ParseIntoStructuredData: function (data, bOptionallyExcludeComments) {
+            ParseIntoStructuredData: function (data, optionallyExcludeComments) {
                 if (typeof (data) === "string") {
                     data = CssParserJs.ParseLess(data);
                 }
-                return objHierarchicalParser.ParseIntoStructuredData(data, (bOptionallyExcludeComments === true) ? true : false);
+                return objHierarchicalParser.ParseIntoStructuredData(data, (optionallyExcludeComments === true) ? true : false);
             },
             FragmentCategorisationOptions: FragmentCategorisationOptions
         };
