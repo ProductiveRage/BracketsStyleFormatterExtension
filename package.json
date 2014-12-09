@@ -4,7 +4,7 @@
     "description": "This formats LESS stylesheets to the format dictated by the Web Team Leader at nm|tU - a balance between a condensed format and readability",
     "keywords":["less","format","formatter"],
     "homepage": "https://bitbucket.org/DanRoberts/bracketsstyleformatterextension",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "author": "Dan Roberts <dangger36@gmail.com> (http://www.productiverage.com)",
     "license": "MIT",
     "engines": {
