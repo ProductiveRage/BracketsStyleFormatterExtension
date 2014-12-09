@@ -182,7 +182,32 @@
             "visited",
             "first-line",
             "first-child",
-            "first-letter"
+            "first-letter",
+            "last-child",
+            "nth-child",
+            "checked",
+            "disabled",
+            "empty",
+            "enabled",
+            "first-of-type",
+            "focus",
+            "in-range",
+            "invalid",
+            "last-of-type",
+            "not",
+            "nth-last-child",
+            "nth-last-of-type",
+            "nth-of-type",
+            "only-of-type",
+            "only-child",
+            "optional",
+            "out-of-range",
+            "read-only",
+            "read-write",
+            "required",
+            "root",
+            "target",
+            "valid"
         ];
 
         isNextWordOneOfThePseudoClasses = function (objStringNavigator) {
