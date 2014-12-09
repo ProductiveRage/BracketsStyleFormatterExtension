@@ -148,10 +148,11 @@
                 confirmedToBePropertyName = isStylePropertyValue(laterFragment);
                 return true;
             });
+            var fragmentValue = trim(fragment.Value);
             var suffix;
             if (confirmedToBePropertyName) {
                 suffix = ": ";
-            } else if (fragment.Value.substr(-1) !== ")") {
+            } else if (fragmentValue.substr(-1) !== ")") {
                 // It's good practice to always use brackets when specifying a mixin, so we'll enforce it when rewriting
                 // the content (it means that analysis about duplicate selectors does not mistakenly consider mixins
                 // to be selectors when performing the work)
@@ -159,7 +160,7 @@
             } else {
                 suffix = ";";
             }
-            return fragment.Value + suffix;
+            return fragmentValue + suffix;
         }
 
         if (isStylePropertyValue(fragment)) {
