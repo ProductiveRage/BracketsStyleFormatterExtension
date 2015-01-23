@@ -45,7 +45,7 @@ becomes
 
 with a single stroke of [Ctrl]-[Alt]-[F]!
 
-(Or via the "Format LESS StyleSheet (nm|tU)" command in the File menu if you'd prefer).
+(Or via the "Format LESS StyleSheet (nm|tU)" command in the Edit menu if you'd prefer).
 
 There are a range of special conditions to try to deal with comments in the least-surprising way. "Same line" comments will remain on the same line as the content they were found with. Comments before nested selectors or media queries will appear directly before the nested content and after any blank line before the nested content. Selectors or media queries containing comments are not considered empty (even if they don't contain any rules or nested content). To illustrate:
 
