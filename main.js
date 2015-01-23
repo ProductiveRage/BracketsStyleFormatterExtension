@@ -95,7 +95,7 @@ define(function (require, exports, module) {
             PANEL_ID = "productiverage.lessformatterwarnings";
         
         CommandManager.register("Format LESS StyleSheet (nm|tU)", CMD_ID, reformatDocumentContent);
-        Menus.getMenu(Menus.AppMenuBar.FILE_MENU).addMenuItem(CMD_ID, "Ctrl-Alt-F");
+        Menus.getMenu(Menus.AppMenuBar.EDIT_MENU).addMenuItem(CMD_ID, "Ctrl-Alt-F");
         
         var $warningsPanel = $("<div id='productiverage-lessformatter-warnings' class='bottom-panel' style='padding: 0.5em;'/>"),
             warningsPanel = PanelManager.createBottomPanel(PANEL_ID, $warningsPanel);
